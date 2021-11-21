@@ -1,0 +1,92 @@
+clc
+clear all
+S=588e6; %MVA
+P= 500e6; %MW
+V= 21e3;%KV
+f=50;% Hz
+omegas=100*pi;
+Ra= 0.0023;
+Xd=2.35;
+Xq=2.15;
+X_dtransient=0.253*1j;
+T_dtransient_open=6;% open circuit d axis time constant
+H= 3.07;% MW-s/MVA
+
+Xt= 0.15*1j; % transformer leakage reactance
+
+Xtrans=1j; % transmission line reactance
+
+% initial conditions
+Pinit=0.85; % initial power output of generator in p.u. 
+Qinit=0.52; % initial reactive power output in p.u.
+Vt=1; % terminal generator voltages
+Xext=0.65*1j; % equivalent impedence between generator terminal voltage and infinite bus
+
+% Stator current 
+I= (Pinit-Qinit*j)/Vt;
+
+% Infinite bus voltage
+Vinf= Vt- Xext*I;
+
+%Generator emf behind transient reactance assumed to be constant
+Eg = Vt + I*X_dtransient;
+
+% power flow equation
+P_e = (Eg*Vinf*sin(angle(Eg)-angle(Vinf)))/(abs(Xext+X_dtransient));
+
+% synch torque coefficient (dPe/ddelta)
+Ks = (abs(Eg*Vinf)*cos(angle(Eg)-angle(Vinf)))/(abs(Xext+X_dtransient));
+Kd=-10;
+Kd1=0;
+Kd2=10;
+Kd3=-10;
+[time1,domega_new1,ddelta_new1]= integrate(Kd1,Ks);
+[time2,domega_new2,ddelta_new2]= integrate(Kd2,Ks);
+[time3,domega_new3,ddelta_new3]= integrate(Kd3,Ks);
+
+
+
+% characteristic matrix Kd=0
+A=[-Kd1/(2*H), -Ks/(2*H); omegas,0];
+[R1,E1,L1]= eig(A);
+
+% characteristic matrix Kd=0
+A=[-Kd2/(2*H), -Ks/(2*H); omegas,0];
+[R2,E2,L2]= eig(A);
+
+% characteristic matrix Kd=0
+A=[-Kd3/(2*H), -Ks/(2*H); omegas,0];
+[R3,E3,L3]= eig(A);
+
+% participation matrix
+p1= (R1*L1);
+p2=(R2*L2);
+p3=R3*L3;
+% linearised State equations of angular frequency
+% Case 1 Kd= 0;
+% Case 2 Kd=10;
+% Case 3 Kd=-10;
+figure
+plot(time1,ddelta_new1,time1,domega_new1)
+figure
+plot(time2,ddelta_new2,time2,domega_new2)
+figure
+plot(time3,ddelta_new3,time3,domega_new3)
+function [time,domega_new,ddelta_new]= integrate(Kd,Ks)
+dt=1e-6;
+t=10;
+time=0:dt:t-dt;
+dTm=0.1;
+H=3.07;
+omegas=100*pi;
+domega_old=zeros(length(time),1);
+ddelta_old=zeros(length(time),1);
+domega_new=zeros(length(time),1);
+ddelta_new=zeros(length(time),1);
+for i=1:length(time)
+domega_new(i)=domega_old(i)+((1/2*H)*(dTm-Ks*ddelta_old(i)-Kd*domega_old(i)))*dt;
+ddelta_new(i)=ddelta_old(i)+(omegas*domega_new(i))*dt;
+domega_old(i+1)=domega_new(i);
+ddelta_old(i+1)=ddelta_new(i);
+end
+end
